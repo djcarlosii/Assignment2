@@ -101,43 +101,56 @@ int main(int argc, char** argv)
     	string challenge="";
 	char buffer[BUFFER_SIZE];
 	int blen = SSL_read(ssl, buffer, BUFFER_SIZE);
-	cout << blen << endl;
+	//cout << blen << endl;
 	challenge = buffer;
-	cout << challenge << endl; 	
+	//cout << challenge << endl; 	
 	printf("DONE.\n");
 	printf("    (Challenge: \"%s\")\n", challenge.c_str());
 
     //-------------------------------------------------------------------------
 	// 3. Generate the SHA1 hash of the challenge
 	printf("3. Generating SHA1 hash...");
-
 	//BIO_new(BIO_s_mem());
+	BIO *mem = BIO_new(BIO_s_mem());
 	//BIO_write
+	int wr = BIO_write( mem, buffer, blen);
+	cout << wr << endl;	
 	//BIO_new(BIO_f_md());
+	BIO * md = BIO_new(BIO_f_md());
 	//BIO_set_md;
+	BIO_set_md(md, EVP_sha1());
+	char bf[EVP_MAX_MD_SIZE];
 	//BIO_push;
+	BIO_push(md, mem);
 	//BIO_gets;
-
-    int mdlen=0;
+	int got = BIO_gets(md, bf, EVP_MAX_MD_SIZE);
+	cout << got << endl;
 	string hash_string = "";
+	hash_string = buff2hex((const unsigned char*)bf, got);
+	cout << hash_string << endl; 
+    	//int mdlen=0;
 
 	printf("SUCCESS.\n");
-	printf("    (SHA1 hash: \"%s\" (%d bytes))\n", hash_string.c_str(), mdlen);
+	printf("    (SHA1 hash: \"%s\" (%d bytes))\n", hash_string.c_str(), got);
 
     //-------------------------------------------------------------------------
 	// 4. Sign the key using the RSA private key specified in the
 	//     file "rsaprivatekey.pem"
 	printf("4. Signing the key...");
-
-    //PEM_read_bio_RSAPrivateKey
-    //RSA_private_encrypt
-
-    int siglen=0;
-    char* signature="FIXME";
-
-    printf("DONE.\n");
-    printf("    (Signed key length: %d bytes)\n", siglen);
-    printf("    (Signature: \"%s\" (%d bytes))\n", buff2hex((const unsigned char*)signature, siglen).c_str(), siglen);
+    	//PEM_read_bio_RSAPrivateKey
+    	char privkey[] = "rsaprivatekey.pem";
+    	BIO *privB = BIO_new_file(privkey, "r");
+	RSA *rsa2 = PEM_read_bio_RSAPrivateKey(privB, NULL, NULL, NULL);
+	int rsasize = RSA_size(rsa2);
+	cout << rsasize << endl;
+    	//RSA_private_encrypt
+    	unsigned char b4[128];
+    	int siglen = RSA_private_encrypt(rsasize-11, (const unsigned char*)bf, b4, rsa2, RSA_PKCS1_PADDING);
+	cout << siglen << endl;
+    	unsigned char* signature= b4;
+    	printf("DONE.\n");
+   	printf("    (Signed key length: %d bytes)\n", siglen);
+    	printf("    (Signature: \"%s\" (%d bytes))\n", buff2hex((const unsigned char*)signature, siglen).c_str(), siglen);
 
     //-------------------------------------------------------------------------
 	// 5. Send the signature to the client for authentication
