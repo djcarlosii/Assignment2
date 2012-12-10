@@ -114,7 +114,7 @@ int main(int argc, char** argv)
 	BIO *mem = BIO_new(BIO_s_mem());
 	//BIO_write
 	int wr = BIO_write( mem, buffer, blen);
-	cout << wr << endl;	
+	//cout << wr << endl;	
 	//BIO_new(BIO_f_md());
 	BIO * md = BIO_new(BIO_f_md());
 	//BIO_set_md;
@@ -124,14 +124,14 @@ int main(int argc, char** argv)
 	BIO_push(md, mem);
 	//BIO_gets;
 	int got = BIO_gets(md, bf, EVP_MAX_MD_SIZE);
-	cout << got << endl;
+	//cout << got << endl;
 	string hash_string = "";
 	hash_string = buff2hex((const unsigned char*)bf, got);
 	cout << hash_string << endl; 
-    	//int mdlen=0;
+    	int mdlen=got;
 
 	printf("SUCCESS.\n");
-	printf("    (SHA1 hash: \"%s\" (%d bytes))\n", hash_string.c_str(), got);
+	printf("    (SHA1 hash: \"%s\" (%d bytes))\n", hash_string.c_str(), mdlen);
 
     //-------------------------------------------------------------------------
 	// 4. Sign the key using the RSA private key specified in the
@@ -142,11 +142,11 @@ int main(int argc, char** argv)
     	BIO *privB = BIO_new_file(privkey, "r");
 	RSA *rsa2 = PEM_read_bio_RSAPrivateKey(privB, NULL, NULL, NULL);
 	int rsasize = RSA_size(rsa2);
-	cout << rsasize << endl;
+	//cout << rsasize << endl;
     	//RSA_private_encrypt
     	unsigned char b4[128];
     	int siglen = RSA_private_encrypt(rsasize-11, (const unsigned char*)bf, b4, rsa2, RSA_PKCS1_PADDING);
-	cout << siglen << endl;
+	//cout << siglen << endl;
     	unsigned char* signature= b4;
     	printf("DONE.\n");
    	printf("    (Signed key length: %d bytes)\n", siglen);
@@ -155,11 +155,14 @@ int main(int argc, char** argv)
     //-------------------------------------------------------------------------
 	// 5. Send the signature to the client for authentication
 	printf("5. Sending signature to client for authentication...");
-
 	//BIO_flush
+	BIO_flush(mem);
 	//SSL_write
-
-    printf("DONE.\n");
+	char b5[BUFFER_SIZE];
+    	memcpy(b5, signature, sizeof(b5)); 
+	cout << "got here" << endl;	
+	int len5 = SSL_write(ssl, b5, BUFFER_SIZE);
+    	printf("DONE.\n");
     
     //-------------------------------------------------------------------------
 	// 6. Receive a filename request from the client

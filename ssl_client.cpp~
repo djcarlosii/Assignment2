@@ -110,6 +110,7 @@ int main(int argc, char** argv)
     	int len=5;
 	//SSL_read;
 	int b3 = SSL_read(ssl, buffa, BUFFER_SIZE);
+	cout << b3 << endl;
 	printf("RECEIVED.\n");
 	printf("    (Signature: \"%s\" (%d bytes))\n", buff2hex((const unsigned char*)buffa, len).c_str(), len);
 

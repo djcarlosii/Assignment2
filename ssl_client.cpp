@@ -117,17 +117,28 @@ int main(int argc, char** argv)
     //-------------------------------------------------------------------------
 	// 3b. Authenticate the signed key
 	printf("3b. Authenticating key...");
-
+	char buffb[BUFFER_SIZE];
 	//BIO_new(BIO_s_mem())
+	BIO *m3 = BIO_new(BIO_s_mem());
 	//BIO_write
+	int w3 = BIO_write( m3, buffa, b3);
+	cout << w3 << endl;
 	//BIO_new_file
+	string generated_key="rsapublickey.pem";
+	BIO *n3 = BIO_new_file(generated_key.c_str(), "r");
 	//PEM_read_bio_RSA_PUBKEY
+	RSA *rsa1 = PEM_read_bio_RSA_PUBKEY(n3, NULL, NULL, NULL);
 	//RSA_public_decrypt
+	int rsasize = RSA_size(rsa1);
+	cout << rsasize << endl;
+	int dec = RSA_public_decrypt(rsasize, (const unsigned char* )buffa, (unsigned char* )buffb, rsa1, RSA_PKCS1_PADDING);
+	cout << dec << endl;
 	//BIO_free
-	
-	string generated_key="";
+	BIO_free(m3);
+	BIO_free(n3);
 	string decrypted_key="";
-    
+	generated_key = buff2hex((const unsigned char* ) buffa, 20);
+        decrypted_key = buff2hex((const unsigned char* ) buffb, 20);
 	printf("AUTHENTICATED\n");
 	printf("    (Generated key: %s)\n", generated_key.c_str());
 	printf("    (Decrypted key: %s)\n", decrypted_key.c_str());
