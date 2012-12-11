@@ -1,3 +1,6 @@
+//Dennis Carlos
+//860867424
+//dcarl002
 //----------------------------------------------------------------------------
 // File: ssl_server.cpp
 // Description: Implementation of an SSL-secured server that performs
@@ -100,6 +103,7 @@ int main(int argc, char** argv)
 	printf("2. Waiting for client to connect and send challenge...");
     	string challenge="";
 	char buffer[BUFFER_SIZE];
+	// SSL_read reads from the ssl into a buffer for a specified length
 	int blen = SSL_read(ssl, buffer, BUFFER_SIZE);
 	//cout << blen << endl;
 	challenge = buffer;
@@ -110,22 +114,25 @@ int main(int argc, char** argv)
     //-------------------------------------------------------------------------
 	// 3. Generate the SHA1 hash of the challenge
 	printf("3. Generating SHA1 hash...");
-	//BIO_new(BIO_s_mem());
+	//BIO_new(BIO_s_mem()); new BIO
+        //BIO_s_mem() returns the memory BIO function
 	BIO *mem = BIO_new(BIO_s_mem());
 	//BIO_write
 	int wr = BIO_write( mem, buffer, blen);
 	//cout << wr << endl;	
-	//BIO_new(BIO_f_md());
+	//BIO_new(BIO_f_md()); new BIO
+	//BIO_f_md returns the message digest BIO method
 	BIO * md = BIO_new(BIO_f_md());
 	//BIO_set_md;
 	BIO_set_md(md, EVP_sha1());
 	char bf[EVP_MAX_MD_SIZE];
-	//BIO_push;
+	//BIO_push; appends the second parameter to the first
 	BIO_push(md, mem);
 	//BIO_gets;
 	int got = BIO_gets(md, bf, EVP_MAX_MD_SIZE);
 	//cout << got << endl;
 	string hash_string = "";
+	//buff2hex: via utils.h: returns a hex representation of (len) bytes of (buf) in a string
 	hash_string = buff2hex((const unsigned char*)bf, got);
 	cout << hash_string << endl; 
     	int mdlen=got;
@@ -137,15 +144,16 @@ int main(int argc, char** argv)
 	// 4. Sign the key using the RSA private key specified in the
 	//     file "rsaprivatekey.pem"
 	printf("4. Signing the key...");
-    	//PEM_read_bio_RSAPrivateKey
+    	//PEM_read_bio_RSAPrivateKey reads a private key using a passphrase. NULL.
     	char privkey[] = "rsaprivatekey.pem";
     	BIO *privB = BIO_new_file(privkey, "r");
 	RSA *rsa2 = PEM_read_bio_RSAPrivateKey(privB, NULL, NULL, NULL);
-	int rsasize = RSA_size(rsa2);
+	int rsasize = RSA_size(rsa2)-11;
 	//cout << rsasize << endl;
-    	//RSA_private_encrypt
+    	//RSA_private_encrypt signs a number of bytes from a source using a private key to another source.
+	// RSA_PCKS1_PADDING version 1.5 padding.
     	unsigned char b4[128];
-    	int siglen = RSA_private_encrypt(rsasize-11, (const unsigned char*)bf, b4, rsa2, RSA_PKCS1_PADDING);
+    	int siglen = RSA_private_encrypt(rsasize, (const unsigned char*)bf, b4, rsa2, RSA_PKCS1_PADDING);
 	//cout << siglen << endl;
     	unsigned char* signature= b4;
     	printf("DONE.\n");
@@ -155,12 +163,12 @@ int main(int argc, char** argv)
     //-------------------------------------------------------------------------
 	// 5. Send the signature to the client for authentication
 	printf("5. Sending signature to client for authentication...");
-	//BIO_flush
+	//BIO_flush writes out any internally buffered data or used to signal end of file
 	BIO_flush(mem);
 	//SSL_write
 	char b5[BUFFER_SIZE];
     	memcpy(b5, signature, sizeof(b5)); 
-	cout << "got here" << endl;	
+	//cout << "got here" << endl;	
 	int len5 = SSL_write(ssl, b5, BUFFER_SIZE);
     	printf("DONE.\n");
     
@@ -168,11 +176,14 @@ int main(int argc, char** argv)
 	// 6. Receive a filename request from the client
 	printf("6. Receiving file request from client...");
 
-    //SSL_read
-    char file[BUFFER_SIZE];
-    memset(file,0,sizeof(file));
-    printf("RECEIVED.\n");
-    printf("    (File requested: \"%s\"\n", file);
+   	//SSL_read
+    	char file[BUFFER_SIZE];
+	memset(file,0,sizeof(file));
+	//SSL_read;
+	int b6 = SSL_read(ssl, file, BUFFER_SIZE);
+	//cout << b6 << endl;
+	printf("RECEIVED.\n");
+    	printf("    (File requested: \"%s\"\n", file);
 
     //-------------------------------------------------------------------------
 	// 7. Send the requested file back to the client (if it exists)
@@ -180,28 +191,47 @@ int main(int argc, char** argv)
 
 	PAUSE(2);
 	//BIO_flush
+	BIO_flush(mem);
 	//BIO_new_file
+    	char send[BUFFER_SIZE];
+	int bytesSent=0;
+	int len7 = 1;
+    	BIO *filB = BIO_new_file(file, "r");
 	//BIO_puts(server, "fnf");
-    //BIO_read(bfile, buffer, BUFFER_SIZE)) > 0)
+	if(filB == NULL){
+		//fnf: file not found
+		int blen7 = BIO_puts(filB, "fnf");
+		cout << endl << "ERROR: file not found!" << endl;
+		SSL_write(ssl, filB, BUFFER_SIZE);
+	}
+    	//BIO_read(bfile, buffer, BUFFER_SIZE)) > 0)
+	else{
 	//SSL_write(ssl, buffer, bytesRead);
-
-    int bytesSent=0;
-    
-    printf("SENT.\n");
-    printf("    (Bytes sent: %d)\n", bytesSent);
+		//while something has been read from file
+		while(len7 > 0){
+			int b7 = BIO_read( filB, send, BUFFER_SIZE);
+			//b7 is used to avoid having to do a full BUFFER_SIZE write at the end of a file
+			//this avoids writing junk in ssl.
+    			len7 = SSL_write(ssl, send, b7);
+			bytesSent+=len7;
+		}
+	    	printf("SENT.\n");
+    		printf("    (Bytes sent: %d)\n", bytesSent);
+	}
 
     //-------------------------------------------------------------------------
 	// 8. Close the connection
 	printf("8. Closing connection...");
 
 	//SSL_shutdown
-    //BIO_reset
-    printf("DONE.\n");
-
-    printf("\n\nALL TASKS COMPLETED SUCCESSFULLY.\n");
+	SSL_shutdown(ssl);
+    	//BIO_reset
+	BIO_reset(server);
+    	printf("DONE.\n");
+    	printf("\n\nALL TASKS COMPLETED SUCCESSFULLY.\n");
 	
     //-------------------------------------------------------------------------
-	// Freedom!
+	// Freedom?
     
 	BIO_free_all(server);
 	return EXIT_SUCCESS;
